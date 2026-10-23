@@ -283,11 +283,12 @@ class BookEnvironment:
             query_emb = self.colpali(**batch_query)
             # 得到问题的多向量表示
             doc_emb_device = self.current_embeddings.to(self.device)
-            # 计算多向量匹配分数
+            # 计算多向量匹配分数，计算maxsim 
             scores = self.colpali_processor.score_multi_vector(query_emb, doc_emb_device)
 
         return scores[0].cpu()
 
+#将分数转换为初始候选顺序
     def retrieve_initial_pages(self, query: str) -> List[int]:
         """
         Retrieve all page indices sorted by similarity (ascending order).
