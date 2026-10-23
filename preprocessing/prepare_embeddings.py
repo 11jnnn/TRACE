@@ -70,12 +70,19 @@ k_value=5
 
     return dict(graph)
 
-
+#这个函数的作用是：按章节生成 ColPali 页面向量，再利用这些向量构建页面语义图，并保存结果
 def prepare_embeddings(data_path: str, image_root: str, output_dir: str,
                       colpali_model_path: str, device: str = "cuda", batch_size: int = 1):
     """
     Generate ColPali embeddings and MoLoRAG graphs for each chapter.
-
+##data_path
+#问题数据文件，用于确定需要处理哪些章节data.jsonl
+#image_root所有书籍、章节图片的根目录images/
+#output_dir生成结果的保存目录
+#colpali_model_path本地 ColPali 模型目录models/colpali/
+#device模型计算设备"cuda"
+#batch_size每次送入模型的图片数量：1
+##
     Args:
         data_path: Path to data.jsonl file
         image_root: Root directory containing book/chapter/image structure
@@ -97,7 +104,9 @@ def prepare_embeddings(data_path: str, image_root: str, output_dir: str,
     ).eval()
     processor = ColPaliProcessor.from_pretrained(colpali_model_path, local_files_only=True)
 
-    # Load data
+    # Load data{"id": "chapter_01-1", "question": "问题一"}
+               #{"id": "chapter_01-2", "question": "问题二"}
+               #{ "id": "chapter_02-1", "question": "问题三"}
     print(f"Loading data from {data_path}...")
     data = []
     with open(data_path, 'r', encoding='utf-8') as f:
@@ -105,12 +114,14 @@ def prepare_embeddings(data_path: str, image_root: str, output_dir: str,
             if line.strip():
                 data.append(json.loads(line))
 
-    # Build chapter index
+    # Build chapter index．建立“章节名 → 图片目录”的索引
     print("Building chapter index...")
     chapter_to_path = {}
     if not os.path.exists(image_root):
         raise FileNotFoundError(f"Image root not found: {image_root}")
 
+
+#图片组织：image_root / 书籍目录 / 章节目录 / 页面图片
     for book_name in os.listdir(image_root):
         book_path = os.path.join(image_root, book_name)
         if os.path.isdir(book_path):
@@ -122,6 +133,7 @@ def prepare_embeddings(data_path: str, image_root: str, output_dir: str,
     print(f"Found {len(chapter_to_path)} chapters")
 
     # Process each unique chapter
+#记录已经处理过的章节
     processed_docs = set()
 
     print("Processing chapters...")
