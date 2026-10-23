@@ -13,10 +13,20 @@ from PIL import Image
 
 from colpali_engine.models import ColPali, ColPaliProcessor
 
-
+##构建语义相关图
+#节点：一张文档页面。
+##边：两个页面的内容相似度满足建边条件。
+#作用：让系统从当前页跳到内容相关的其他页面，即使它们的页码相距很远
 def construct_page_graph_simple(embeddings, threshold=0.7, k_value=5):
     """
-    Construct page graph using cosine similarity.
+embeddings
+已经计算好的各页面向量
+threshold=0.7
+只有相似度不低于 0.7，才允许建立连接
+k_value=5
+每页最多保留 5 个相似页面
+
+   Construct page graph using cosine similarity.
 
     Args:
         embeddings: numpy array of shape [N, 32, 128] (ColPali multi-vector embeddings)
@@ -28,24 +38,25 @@ def construct_page_graph_simple(embeddings, threshold=0.7, k_value=5):
     """
     import numpy as np
     from collections import defaultdict
-
+#会的页面总数
     n_pages = embeddings.shape[0]
+#创建一个默认为空的列表
     graph = defaultdict(list)
 
-    # Mean pooling: [N, 32, 128] -> [N, 128]
+    # Mean pooling: [N, 32, 128] -> [N, 128]“每页的向量数量”这一维取平均，得到：[N, 128]，
     emb_mean = embeddings.mean(axis=1)
 
-    # Normalize for cosine similarity
+    # Normalize for cosine similarity归一化
     emb_norm = emb_mean / (np.linalg.norm(emb_mean, axis=1, keepdims=True) + 1e-8)
 
     # Compute similarity matrix
     sim_matrix = np.dot(emb_norm, emb_norm.T)
 
-    # Build graph
+    # Build graph逐页排序，找到最相似的页面
     for i in range(n_pages):
         # Get top-k similar pages (excluding self)
         similarities = sim_matrix[i]
-        top_indices = np.argsort(similarities)[::-1]
+        top_indices = np.argsort(similarities)[::-1]#返回按数值从小到大排列的索引[3, 2, 1, 0]
 
         count = 0
         for j in top_indices:
