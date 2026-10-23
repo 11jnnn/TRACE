@@ -54,7 +54,7 @@ class BookEnvironment:
         )
 
         # Initialize vision client for Navigator
-        # 创建页面模型客户端，用来判断页面是否相关、提取证据
+        # 创建navigator使用的页面模型客户端，用来判断页面是否相关、提取证据
         self.vision_client = OpenAIChatCompletionClient(
             api_key=config.navigator.api_key,
             base_url=config.navigator.base_url,
