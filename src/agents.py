@@ -60,7 +60,12 @@ class AgenticSystem:
         Args:
             question: The question to answer
             options: List of answer options (e.g., ["A. ...", "B. ...", ...])
-            book_env: BookEnvironment instance with loaded resources
+            book_env: BookEnvironment instance with loaded resourcesquestion
+原始问题
+options
+选择题选项列表
+book_env
+已加载页面向量、语义图和模型的检索环境
 
         Returns:
             Dictionary containing:
@@ -71,6 +76,8 @@ class AgenticSystem:
         doc_logs = []
 
         # ==================== Stage 1: Planner ====================
+   
+        #创建模型代理     
         planner = AssistantAgent(
             name="planner",
             model_client=self.planner_client,
@@ -78,14 +85,16 @@ class AgenticSystem:
         )
 
         try:
+         #发送问题
             plan_res = await planner.on_messages(
                 [TextMessage(content=f"Question: {question}", source="user")],
                 cancellation_token=CancellationToken()
             )
+           #得到分解问题的字符串
             raw_plan = plan_res.chat_message.content
             doc_logs.append(f"[Planner] Raw Output: {raw_plan}")
 
-            # Parse JSON list from planner output
+            # Parse JSON list from planner output，转化为Python列表子问题
             match = re.search(r"\[.*\]", raw_plan, re.DOTALL)
             if match:
                 search_steps = json.loads(match.group(0))
@@ -99,13 +108,14 @@ class AgenticSystem:
 
         # ==================== Stage 2: Navigator ====================
         global_evidence_pool = []  # Stores evidence text
-        all_retrieved_pages = set()  # Stores all relevant page indices
-        global_score_accumulator = None  # Accumulates scores across steps
+        all_retrieved_pages = set()  # Stores all relevant page indices所有子问题累计接纳的页面索引，自动去重
+        global_score_accumulator = None  # Accumulates scores across steps每个页面在各子问题下的 MaxSim 分数之和
 
         for step_idx, step_query in enumerate(search_steps):
             doc_logs.append(f"\n--- Step {step_idx + 1}: {step_query} ---")
 
             # Calculate similarity scores for this query
+            #计算maxsim
             current_scores = book_env.retrieve_page_scores(step_query)
             if len(current_scores) > 0:
                 if global_score_accumulator is None:
@@ -113,9 +123,9 @@ class AgenticSystem:
                 global_score_accumulator += current_scores
 
             # Initialize search state
-            step_accepted = []  # Pages accepted as relevant
-            step_blacklist = set()  # Pages rejected as irrelevant
-            search_stack = book_env.retrieve_initial_pages(step_query)  # Sorted ascending
+            step_accepted = []  # Pages accepted as relevant当前子问题已经接纳的页面
+            step_blacklist = set()  # Pages rejected as irrelevant当前子问题已经判为无关的页面
+            search_stack = book_env.retrieve_initial_pages(step_query)  # Sorted ascending当前子问题待检查的页面
 
             doc_logs.append(f"Initial Stack Size: {len(search_stack)}, Top: {[book_env.index_to_uid(i) for i in search_stack[-3:]]}")
 
